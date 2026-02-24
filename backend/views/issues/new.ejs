@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Issue Book</title>
+</head>
+<body>
+    <h1>Issue Book</h1>
+    <a href="/issues">go back to issues list</a>
+    <br><br><br>
+
+<form action="/issues" method="POST">
+
+  <label>User:</label>
+  <select name="userId">
+    <% users.forEach(user => { %>
+      <option value="<%= user._id %>"><%= user.name %></option>
+    <% }) %>
+  </select>
+
+  <label>Book:</label>
+  <select name="bookId">
+    <% books.forEach(book => { %>
+      <option value="<%= book._id %>"><%= book.title %></option>
+    <% }) %>
+  </select>
+
+  <button>Issue Book</button>
+
+</form>
+</body>
+</html>

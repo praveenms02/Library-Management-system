@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>index route</title>
+</head>
+<body>
+    <h1>Library Books</h1>
+
+    <a href="/books/new">Add Book</a>
+
+<% books.forEach(book => { %>
+  <div>
+    <div>
+      <h2>Book title: <%= book.title %></h2>
+      <p>Author: <%= book.author %></p>
+      <p>Number of copies: <%= book.availableCopies %></p>
+    </div>
+
+    <div>
+      <a href="/books/<%= book._id %>/edit" style="display: inline-block; margin-right: 10px;">Edit</a>
+
+      <form action="/books/<%= book._id %>/delete" method="POST" style="display: inline;">
+        <button type="submit">Delete</button>
+      </form>
+    </div>
+  </div>
+<% }) %>
+</body>
+</html>

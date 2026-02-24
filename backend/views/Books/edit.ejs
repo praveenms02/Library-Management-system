@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Book</title>
+</head>
+<body>
+   <h1>Edit Book</h1>
+
+<form action="/books/<%= book._id %>" method="POST">
+  <input name="title" value="<%= book.title %>" />
+  <input name="author" value="<%= book.author %>" />
+  <input name="isbn" value="<%= book.isbn %>" />
+  <input name="category" value="<%= book.category %>" />
+  <input name="availableCopies" value="<%= book.availableCopies %>" />
+  <button>Update</button>
+</form> 
+</body>
+</html>

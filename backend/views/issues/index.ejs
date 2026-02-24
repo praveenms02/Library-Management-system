@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Issued Books</title>
+</head>
+<body>
+    <h1>Issued Books</h1>
+    <a href="/issues/new">Add New Issue</a>
+
+<% issues.forEach(issue => { %>
+  <div style="border: 1px solid black; margin-bottom: 2px; padding-left: 5px;">
+   <div>
+     <p>
+      User: <%= issue.userId ? issue.userId.name : "Unknown User" %> <br><br>
+      Book: <%= issue.bookId ? issue.bookId.title : "Book Deleted" %> <br><br>
+      Status: <%= issue.status %>
+    </p>
+   </div>
+
+    <% if(issue.status === "issued") { %>
+      <form action="/issues/<%= issue._id %>/return" method="POST">
+        <button>Return Book</button>
+      </form>
+    <% } %>
+
+  </div>
+<% }) %>
+</body>
+</html>
