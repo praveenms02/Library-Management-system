@@ -1,59 +1,99 @@
 const express = require("express");
 const router = express.Router();
 const Books = require("../models/Book");
+const Issue = require("../models/Issue");
 
-
-// 📚 SHOW ALL BOOKS
+// GET all books
 router.get("/", async (req, res) => {
   const books = await Books.find();
   res.json(books);
 });
 
-
-// 📖 SHOW FORM TO ADD NEW BOOK
-router.get("/new", (req, res) => {
-  res.json({ message: "Books/new" });
-});
-
-
-// ➕ ADD NEW BOOK
+// Create new book
 router.post("/", async (req, res) => {
-  await Books.create(req.body);
-  res.json({ message: "Book added successfully" });
+  const book = await Books.create(req.body);
+  res.status(201).json(book);
 });
 
+// Get one book
+router.get("/:id", async (req, res) => {
+  const book = await Books.findById(req.params.id);
+  if (!book) {
+    return res.status(404).json({ message: "Book not found" });
+  }
+  res.json(book);
+});
 
-// ✏️ SHOW EDIT FORM
+// Get one book for edit
 router.get("/:id/edit", async (req, res) => {
   const book = await Books.findById(req.params.id);
+  if (!book) {
+    return res.status(404).json({ message: "Book not found" });
+  }
   res.json({ book });
 });
 
-
-// 🔄 UPDATE BOOK
-router.post("/:id", async (req, res) => {
-  await Books.findByIdAndUpdate(req.params.id, req.body);
-  res.json({ message: "Book updated successfully" });
+// Update book
+router.put("/:id", async (req, res) => {
+  const updatedBook = await Books.findByIdAndUpdate(req.params.id, req.body, {
+    new: true,
+    runValidators: true,
+  });
+  if (!updatedBook) {
+    return res.status(404).json({ message: "Book not found" });
+  }
+  res.json(updatedBook);
 });
 
+// Backward-compatible update route for older forms
+router.post("/:id", async (req, res) => {
+  const updatedBook = await Books.findByIdAndUpdate(req.params.id, req.body, {
+    new: true,
+    runValidators: true,
+  });
+  if (!updatedBook) {
+    return res.status(404).json({ message: "Book not found" });
+  }
+  res.json(updatedBook);
+});
 
-// ❌ DELETE BOOK
-
-const Issue = require("../models/Issue");
-
-router.post("/:id/delete", async (req, res) => {
-
-  // check if book is currently issued
+// Delete book
+router.delete("/:id", async (req, res) => {
   const activeIssue = await Issue.findOne({
     bookId: req.params.id,
-    status: "issued"
+    status: "issued",
   });
 
   if (activeIssue) {
-    return res.send("Cannot delete book. It is currently issued.");
+    return res
+      .status(400)
+      .json({ message: "Cannot delete book. It is currently issued." });
   }
 
-  await Books.findByIdAndDelete(req.params.id);
+  const deletedBook = await Books.findByIdAndDelete(req.params.id);
+  if (!deletedBook) {
+    return res.status(404).json({ message: "Book not found" });
+  }
+  res.json({ message: "Book deleted successfully" });
+});
+
+// Backward-compatible delete route for older forms
+router.post("/:id/delete", async (req, res) => {
+  const activeIssue = await Issue.findOne({
+    bookId: req.params.id,
+    status: "issued",
+  });
+
+  if (activeIssue) {
+    return res
+      .status(400)
+      .json({ message: "Cannot delete book. It is currently issued." });
+  }
+
+  const deletedBook = await Books.findByIdAndDelete(req.params.id);
+  if (!deletedBook) {
+    return res.status(404).json({ message: "Book not found" });
+  }
   res.json({ message: "Book deleted successfully" });
 });
 
