@@ -1,0 +1,5 @@
+backend/node_modules/
+library-dashboard/node_modules/
+library-dashboard/dist/
+backend/.env
+library-dashboard/.env
