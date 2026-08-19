@@ -3,9 +3,6 @@ const router = express.Router();
 
 const Issue = require("../models/Issue");
 const Book = require("../models/Book");
-const User = require("../models/User");
-const bcrypt = require("bcryptjs");
-const crypto = require("crypto");
 const { authenticate, authorize } = require("../middleware/auth");
 
 router.use(authenticate);
@@ -20,9 +17,9 @@ const getCalendarDay = (date) => {
 const getOverdueDays = (endDate, dueDate) => Math.max(0, Math.floor((getCalendarDay(endDate) - getCalendarDay(dueDate)) / (1000 * 60 * 60 * 24)));
 
 const formatIssue = (issue) => {
-  const dueDate = getDueDate(issue);
+  const dueDate = ["issued", "returned"].includes(issue.status) ? getDueDate(issue) : null;
   const endDate = issue.returnDate || new Date();
-  const overdueDays = getOverdueDays(endDate, dueDate);
+  const overdueDays = dueDate ? getOverdueDays(endDate, dueDate) : 0;
   const estimatedFine = overdueDays * FINE_PER_DAY;
 
   return {
@@ -35,6 +32,7 @@ const formatIssue = (issue) => {
   dueDate: dueDate ? new Date(dueDate).toISOString().split("T")[0] : null,
   returnDate: issue.returnDate ? new Date(issue.returnDate).toISOString().split("T")[0] : null,
   status: issue.status,
+  requestedAt: issue.requestedAt,
   fineAmount: issue.status === "returned" ? issue.fineAmount : 0,
   overdueDays,
   estimatedFine,
@@ -43,81 +41,84 @@ const formatIssue = (issue) => {
   };
 };
 
-// Show issue page
-router.get("/new", authorize("admin"), async (req, res) => {
-  const books = await Book.find();
-  const users = await User.find();
+const populateIssue = (id) => Issue.findById(id)
+  .populate("userId")
+  .populate("bookId");
 
-  res.render("issues/new", { books, users });
-});
-
-// Issue book
-router.post("/", authorize("admin"), async (req, res) => {
-  const { userId, userName, bookId, issueDate } = req.body;
+// Request a book for admin approval.
+router.post("/request", authorize("user", "student"), async (req, res) => {
+  const { bookId } = req.body;
   const book = await Book.findById(bookId);
 
   if (!book || book.availableCopies <= 0) {
-    return res.status(400).json({ message: "Book not available" });
-  }
-
-  let resolvedUserId = userId;
-
-  if (!resolvedUserId && userName) {
-    const trimmedName = userName.trim();
-    if (!trimmedName) {
-      return res.status(400).json({ message: "User name is required" });
-    }
-
-    const syntheticEmail = `${trimmedName.toLowerCase().replace(/\s+/g, ".")}@library.local`;
-    let user = await User.findOne({ name: trimmedName });
-
-    if (!user) {
-      user = await User.create({
-        name: trimmedName,
-        email: syntheticEmail,
-        role: "student",
-        password: await bcrypt.hash(crypto.randomBytes(24).toString("hex"), 10),
-      });
-    }
-
-    resolvedUserId = user._id;
-  }
-
-  if (!resolvedUserId) {
-    return res.status(400).json({ message: "User information is required" });
+    return res.status(400).json({ message: "Book is not available" });
   }
 
   const existingIssue = await Issue.findOne({
-    userId: resolvedUserId,
+    userId: req.user.userId,
     bookId,
-    status: "issued",
+    status: { $in: ["pending", "issued"] },
   });
 
   if (existingIssue) {
-    return res
-      .status(400)
-      .json({ message: "User already has this book issued" });
+    return res.status(400).json({ message: "You already have a pending or issued request for this book" });
   }
 
-  const resolvedIssueDate = issueDate ? new Date(issueDate) : new Date();
-  const dueDate = new Date(resolvedIssueDate);
-  dueDate.setDate(dueDate.getDate() + 15);
   const issue = await Issue.create({
-    userId: resolvedUserId,
+    userId: req.user.userId,
     bookId,
-    issueDate: resolvedIssueDate,
-    dueDate,
-    status: "issued",
+    status: "pending",
   });
+
+  res.status(201).json(formatIssue(await populateIssue(issue._id)));
+});
+
+router.get("/requests", authorize("admin"), async (req, res) => {
+  const issues = await Issue.find({ status: "pending" })
+    .populate("userId")
+    .populate("bookId")
+    .sort({ createdAt: -1 });
+
+  res.json(issues.map(formatIssue));
+});
+
+router.patch("/:id/approve", authorize("admin"), async (req, res) => {
+  const issue = await Issue.findById(req.params.id);
+  if (!issue || issue.status !== "pending") {
+    return res.status(404).json({ message: "Pending request not found" });
+  }
+
+  const book = await Book.findById(issue.bookId);
+  if (!book || book.availableCopies <= 0) {
+    return res.status(400).json({ message: "Book is no longer available" });
+  }
+
+  const issueDate = new Date();
+  const dueDate = new Date(issueDate);
+  dueDate.setDate(dueDate.getDate() + 15);
+  issue.issueDate = issueDate;
+  issue.dueDate = dueDate;
+  issue.status = "issued";
+  await issue.save();
 
   book.availableCopies -= 1;
   await book.save();
 
-  const populatedIssue = await Issue.findById(issue._id)
-    .populate("userId")
-    .populate("bookId");
+  res.json(formatIssue(await populateIssue(issue._id)));
+});
 
-  res.status(201).json(formatIssue(populatedIssue));
+router.patch("/:id/reject", authorize("admin"), async (req, res) => {
+  const issue = await Issue.findOneAndUpdate(
+    { _id: req.params.id, status: "pending" },
+    { status: "rejected" },
+    { new: true },
+  );
+
+  if (!issue) {
+    return res.status(404).json({ message: "Pending request not found" });
+  }
+
+  res.json(formatIssue(await populateIssue(issue._id)));
 });
 
 router.get("/overdue", authorize("admin"), async (req, res) => {
@@ -131,8 +132,8 @@ router.get("/overdue", authorize("admin"), async (req, res) => {
 // Get all issued books
 router.get("/", async (req, res) => {
   const query = req.user.role === "admin"
-    ? { status: "issued" }
-    : { userId: req.user.userId, status: "issued" };
+    ? { status: { $in: ["issued", "returned"] } }
+    : { userId: req.user.userId, status: { $in: ["pending", "issued", "returned", "rejected"] } };
   const issues = await Issue.find(query)
     .populate("userId")
     .populate("bookId");
@@ -150,6 +151,15 @@ const returnIssuedBook = async (req, res) => {
 
   if (issue.status === "returned") {
     return res.status(400).json({ message: "Book already returned" });
+  }
+
+  if (issue.status !== "issued") {
+    return res.status(400).json({ message: "Only issued books can be returned" });
+  }
+
+  const isOwner = issue.userId.toString() === req.user.userId;
+  if (!isOwner) {
+    return res.status(403).json({ message: "You can only return your own books" });
   }
 
   issue.status = "returned";
@@ -175,9 +185,9 @@ const returnIssuedBook = async (req, res) => {
   });
 };
 
-router.delete("/:id", authorize("admin"), returnIssuedBook);
+router.delete("/:id", returnIssuedBook);
 
 // Backward-compatible return route for older forms
-router.post("/:id/return", authorize("admin"), returnIssuedBook);
+router.post("/:id/return", returnIssuedBook);
 
 module.exports = router;

@@ -28,12 +28,17 @@ const Issues = new mongoose.Schema({
   },
   status: {
     type: String,
+    enum: ["pending", "issued", "returned", "rejected"],
     default: "issued",
   },
   fineAmount: {
     type: Number,
     default: 0,
     min: 0,
+  },
+  requestedAt: {
+    type: Date,
+    default: Date.now,
   },
 });
 
