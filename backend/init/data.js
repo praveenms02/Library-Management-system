@@ -3,19 +3,28 @@ module.exports = {
   // USERS COLLECTION
   users: [
     {
+      name: "Library Admin",
+      email: "admin@library.local",
+      role: "admin",
+      password: "admin123"
+    },
+    {
       name: "Praveen",
       email: "praveen@gmail.com",
-      role: "student"
+      role: "student",
+      password: "library123"
     },
     {
       name: "Rahul",
       email: "rahul@gmail.com",
-      role: "student"
+      role: "student",
+      password: "library123"
     },
     {
       name: "Ananya",
       email: "ananya@gmail.com",
-      role: "student"
+      role: "student",
+      password: "library123"
     }
   ],
 

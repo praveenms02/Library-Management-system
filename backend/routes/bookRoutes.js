@@ -2,6 +2,9 @@ const express = require("express");
 const router = express.Router();
 const Books = require("../models/Book");
 const Issue = require("../models/Issue");
+const { authenticate, authorize } = require("../middleware/auth");
+
+router.use(authenticate);
 
 // GET all books
 router.get("/", async (req, res) => {
@@ -10,7 +13,7 @@ router.get("/", async (req, res) => {
 });
 
 // Create new book
-router.post("/", async (req, res) => {
+router.post("/", authorize("admin"), async (req, res) => {
   const book = await Books.create(req.body);
   res.status(201).json(book);
 });
@@ -34,7 +37,7 @@ router.get("/:id/edit", async (req, res) => {
 });
 
 // Update book
-router.put("/:id", async (req, res) => {
+router.put("/:id", authorize("admin"), async (req, res) => {
   const updatedBook = await Books.findByIdAndUpdate(req.params.id, req.body, {
     new: true,
     runValidators: true,
@@ -46,7 +49,7 @@ router.put("/:id", async (req, res) => {
 });
 
 // Backward-compatible update route for older forms
-router.post("/:id", async (req, res) => {
+router.post("/:id", authorize("admin"), async (req, res) => {
   const updatedBook = await Books.findByIdAndUpdate(req.params.id, req.body, {
     new: true,
     runValidators: true,
@@ -58,7 +61,7 @@ router.post("/:id", async (req, res) => {
 });
 
 // Delete book
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", authorize("admin"), async (req, res) => {
   const activeIssue = await Issue.findOne({
     bookId: req.params.id,
     status: "issued",
@@ -78,7 +81,7 @@ router.delete("/:id", async (req, res) => {
 });
 
 // Backward-compatible delete route for older forms
-router.post("/:id/delete", async (req, res) => {
+router.post("/:id/delete", authorize("admin"), async (req, res) => {
   const activeIssue = await Issue.findOne({
     bookId: req.params.id,
     status: "issued",

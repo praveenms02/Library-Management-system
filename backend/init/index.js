@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const Book = require("../models/Book");
 const User = require("../models/User");
 const Issue = require("../models/Issue");
+const bcrypt = require("bcryptjs");
 
 const initdata = require("./data.js");
 
@@ -26,7 +27,14 @@ async function initialiseDB() {
   console.log("existing data deleted");
 
   // insert users
-  const users = await User.insertMany(initdata.users);
+  const users = await User.insertMany(
+    await Promise.all(
+      initdata.users.map(async (user) => ({
+        ...user,
+        password: await bcrypt.hash(user.password, 10),
+      }))
+    )
+  );
 
   // insert books
   const books = await Book.insertMany(initdata.books);
